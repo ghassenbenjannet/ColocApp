@@ -340,10 +340,15 @@ export const generateStyledPDF = (monthData, roommates) => {
 
   // Calculer le solde
   const calculateBalance = () => {
-    const totalFixed = parseFloat(expenses.rent || 0) + parseFloat(expenses.utilities || 0) + parseFloat(expenses.internet || 0);
     const rentAmount = parseFloat(expenses.rent || 0);
     const utilitiesAmount = parseFloat(expenses.utilities || 0);
     const internetAmount = parseFloat(expenses.internet || 0);
+
+    // Calculer le total UNIQUEMENT des frais qui ont été payés
+    let totalFixed = 0;
+    if (expenses.rentPaidBy) totalFixed += rentAmount;
+    if (expenses.utilitiesPaidBy) totalFixed += utilitiesAmount;
+    if (expenses.internetPaidBy) totalFixed += internetAmount;
 
     // Initialiser le balance à 0 pour chaque colocataire
     let balance = {

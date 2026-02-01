@@ -453,10 +453,15 @@ const App = () => {
   const calculateBalance = useCallback((monthData) => {
     const { expenses, sharedExpenses, otherExpenses, monthType } = monthData;
 
-    const totalFixed = parseFloat(expenses.rent || 0) + parseFloat(expenses.utilities || 0) + parseFloat(expenses.internet || 0);
     const rentAmount = parseFloat(expenses.rent || 0);
     const utilitiesAmount = parseFloat(expenses.utilities || 0);
     const internetAmount = parseFloat(expenses.internet || 0);
+
+    // Calculer le total UNIQUEMENT des frais qui ont été payés
+    let totalFixed = 0;
+    if (expenses.rentPaidBy) totalFixed += rentAmount;
+    if (expenses.utilitiesPaidBy) totalFixed += utilitiesAmount;
+    if (expenses.internetPaidBy) totalFixed += internetAmount;
 
     // Initialiser le balance à 0 pour chaque colocataire
     let balance = {
@@ -494,7 +499,7 @@ const App = () => {
       balance[roommates[1]] += totalFixed / 2;
     }
 
-    // ÉTAPE 3 : Frais partagés (déjà correcte)
+    // ÉTAPE 3 : Frais partagés
     sharedExpenses.forEach(exp => {
       const share = parseFloat(exp.amount || 0) / 2;
       balance[exp.paidBy] -= share;
@@ -502,7 +507,7 @@ const App = () => {
       if (other) balance[other] += share;
     });
 
-    // ÉTAPE 4 : Autres frais (déjà correcte)
+    // ÉTAPE 4 : Autres frais
     otherExpenses.forEach(exp => {
       balance[exp.payer] -= parseFloat(exp.amount || 0);
       balance[exp.recipient] += parseFloat(exp.amount || 0);
