@@ -1,101 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Download, Users, Receipt, TrendingUp, Calendar, Euro, FileText, ArrowRight, Check, Edit2, Save, X } from 'lucide-react';
 import { getColocConfig, saveColocConfig, getMonth, saveMonth, getAllMonths, getMonthKey } from './api';
+import { generateStyledPDF } from './pdfGenerator';
 
 const formatEuro = (amount) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount || 0);
-};
-
-const generatePDF = (monthData, roommates) => {
-  const { month, year, expenses, sharedExpenses, otherExpenses, regularization, monthType } = monthData;
-
-  const totalRent = parseFloat(expenses.rent || 0);
-  const totalUtilities = parseFloat(expenses.utilities || 0);
-  const totalInternet = parseFloat(expenses.internet || 0);
-  const fixedTotal = totalRent + totalUtilities + totalInternet;
-
-  let perPersonCalc = '';
-  if (monthType === 'custom') {
-    const days1 = parseInt(expenses.daysRoommate1 || 0);
-    const days2 = parseInt(expenses.daysRoommate2 || 0);
-    const totalDays = days1 + days2;
-    const perPerson1 = totalDays > 0 ? (fixedTotal * days1) / totalDays : 0;
-    const perPerson2 = totalDays > 0 ? (fixedTotal * days2) / totalDays : 0;
-    perPersonCalc = `Part ${roommates[0]}: ${formatEuro(perPerson1)} (${days1} jours)\nPart ${roommates[1]}: ${formatEuro(perPerson2)} (${days2} jours)`;
-  } else {
-    const perPerson = fixedTotal / 2;
-    perPersonCalc = `Part par personne: ${formatEuro(perPerson)}`;
-  }
-
-  let pdfContent = `
-RÉCAPITULATIF COLOCATION
-${month} ${year}
-==============================================
-
-COLOCATAIRES
-${roommates.map((r, i) => `  ${i + 1}. ${r}`).join('\n')}
-
-TYPE DE MOIS: ${monthType === 'custom' ? 'Personnalisé' : 'Complet'}
-
------
-FRAIS FIXES
-
-Loyer:                    ${formatEuro(totalRent)}
-  Payé par: ${expenses.rentPaidBy || 'Non spécifié'}
-
-Gaz & Électricité:        ${formatEuro(totalUtilities)}
-  Payé par: ${expenses.utilitiesPaidBy || 'Non spécifié'}
-
-Internet:                 ${formatEuro(totalInternet)}
-  Payé par: ${expenses.internetPaidBy || 'Non spécifié'}
-
-TOTAL:                    ${formatEuro(fixedTotal)}
-${perPersonCalc}
-
------
-FRAIS PARTAGÉS (50% chacun)
-
-${sharedExpenses.length === 0 ? 'Aucun frais partagé' : sharedExpenses.map(exp =>
-    `${exp.description}
-  Montant: ${formatEuro(exp.amount)}
-  Payé par: ${exp.paidBy}
-  Part par personne: ${formatEuro(exp.amount / 2)}`
-  ).join('\n\n')}
-
------
-AUTRES FRAIS
-
-${otherExpenses.length === 0 ? 'Aucun autre frais' : otherExpenses.map(exp =>
-    `${exp.payer} a payé ${formatEuro(exp.amount)} pour ${exp.recipient}
-  Motif: ${exp.description}`
-  ).join('\n\n')}
-
------
-RÉGULARISATION
-
-${!regularization.type ? 'Aucune régularisation' :
-      regularization.type === 'ponctuelle'
-        ? `Type: Régularisation ponctuelle
-${regularization.from} doit ${formatEuro(regularization.amount)} à ${regularization.to}
-Date: ${regularization.date || 'Non spécifiée'}`
-        : `Type: Retenue sur le mois suivant
-Montant à déduire: ${formatEuro(regularization.amount)}
-Déduction pour: ${regularization.recipient}`
-    }
-
-==============================================
-Document généré le ${new Date().toLocaleDateString('fr-FR')}
-  `;
-
-  const blob = new Blob([pdfContent], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `colocation-${month}-${year}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 };
 
 const App = () => {
@@ -197,6 +106,60 @@ const App = () => {
     saveCurrentMonth();
   }, [currentMonth, dataLoaded, isSetupComplete]);
 
+  // Synchronisation automatique de la régularisation avec le mois suivant
+  useEffect(() => {
+    if (!dataLoaded || !isSetupComplete) return;
+    if (currentMonth.regularization.type !== 'retenue' || !currentMonth.regularization.amount) return;
+
+    const syncRegularization = async () => {
+      try {
+        // Calculer le mois suivant
+        const currentDate = new Date(currentMonth.year,
+          ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+            .indexOf(currentMonth.month.toLowerCase()));
+        currentDate.setMonth(currentDate.getMonth() + 1);
+
+        const nextMonthName = currentDate.toLocaleDateString('fr-FR', { month: 'long' });
+        const nextYear = currentDate.getFullYear();
+        const nextMonthKey = getMonthKey(nextMonthName, nextYear);
+        const currentMonthKey = getMonthKey(currentMonth.month, currentMonth.year);
+
+        // Charger le mois suivant
+        const nextMonth = await getMonth(nextMonthKey);
+        if (!nextMonth) return; // Le mois suivant n'existe pas encore
+
+        // Trouver la ligne automatique existante
+        const autoExpenseIndex = nextMonth.otherExpenses.findIndex(
+          exp => exp.isAutomatic && exp.fromMonth === currentMonthKey
+        );
+
+        if (autoExpenseIndex >= 0) {
+          // Mettre à jour le montant si différent
+          const currentAutoExpense = nextMonth.otherExpenses[autoExpenseIndex];
+          if (parseFloat(currentAutoExpense.amount) !== parseFloat(currentMonth.regularization.amount)) {
+            const otherRoommate = roommates.find(r => r !== currentMonth.regularization.recipient);
+            nextMonth.otherExpenses[autoExpenseIndex] = {
+              ...currentAutoExpense,
+              payer: currentMonth.regularization.recipient,
+              recipient: otherRoommate,
+              amount: currentMonth.regularization.amount,
+              description: `Restant du mois ${currentMonth.month} ${currentMonth.year}`
+            };
+
+            // Sauvegarder le mois suivant mis à jour
+            await saveMonth(nextMonthKey, nextMonth);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors de la synchronisation:', error);
+      }
+    };
+
+    // Petit délai pour éviter trop d'appels API
+    const timeoutId = setTimeout(syncRegularization, 500);
+    return () => clearTimeout(timeoutId);
+  }, [currentMonth.regularization, dataLoaded, isSetupComplete, currentMonth.month, currentMonth.year, roommates]);
+
   const addRoommate = () => {
     if (newRoommateName.trim() && roommates.length < 2) {
       setRoommates([...roommates, newRoommateName.trim()]);
@@ -260,11 +223,19 @@ const App = () => {
 
   const updateOtherExpense = (index, field, value) => {
     const updated = [...currentMonth.otherExpenses];
+    // Empêcher la modification des lignes automatiques
+    if (updated[index].isAutomatic) {
+      return;
+    }
     updated[index][field] = value;
     setCurrentMonth({ ...currentMonth, otherExpenses: updated });
   };
 
   const removeOtherExpense = (index) => {
+    // Empêcher la suppression des lignes automatiques
+    if (currentMonth.otherExpenses[index].isAutomatic) {
+      return;
+    }
     setCurrentMonth({
       ...currentMonth,
       otherExpenses: currentMonth.otherExpenses.filter((_, i) => i !== index)
@@ -287,9 +258,16 @@ const App = () => {
       ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'].indexOf(currentMonth.month.toLowerCase()));
     currentDate.setMonth(currentDate.getMonth() + 1);
 
-    setCurrentMonth({
-      month: currentDate.toLocaleDateString('fr-FR', { month: 'long' }),
-      year: currentDate.getFullYear(),
+    const nextMonthName = currentDate.toLocaleDateString('fr-FR', { month: 'long' });
+    const nextYear = currentDate.getFullYear();
+
+    // Charger le mois suivant s'il existe déjà
+    const nextMonthKey = getMonthKey(nextMonthName, nextYear);
+    const existingNextMonth = await getMonth(nextMonthKey);
+
+    let nextMonthData = {
+      month: nextMonthName,
+      year: nextYear,
       monthType: 'complete',
       expenses: {
         rent: '', rentPaidBy: '',
@@ -301,7 +279,45 @@ const App = () => {
       sharedExpenses: [],
       otherExpenses: [],
       regularization: { type: '', from: '', to: '', amount: '', date: '', recipient: '' }
-    });
+    };
+
+    // Si le mois suivant existe déjà, le charger
+    if (existingNextMonth) {
+      nextMonthData = existingNextMonth;
+    }
+
+    // === GESTION AUTOMATIQUE DE LA RÉGULARISATION ===
+    if (currentMonth.regularization.type === 'retenue' && currentMonth.regularization.amount) {
+      // Trouver l'autre colocataire
+      const otherRoommate = roommates.find(r => r !== currentMonth.regularization.recipient);
+
+      // Vérifier si une régularisation automatique de ce mois existe déjà
+      const existingAutoExpenseIndex = nextMonthData.otherExpenses.findIndex(
+        exp => exp.isAutomatic && exp.fromMonth === monthKey
+      );
+
+      const autoExpense = {
+        payer: currentMonth.regularization.recipient,
+        recipient: otherRoommate,
+        amount: currentMonth.regularization.amount,
+        description: `Restant du mois ${currentMonth.month} ${currentMonth.year}`,
+        isAutomatic: true, // Marquer comme automatique (lecture seule)
+        fromMonth: monthKey // Lier au mois d'origine
+      };
+
+      if (existingAutoExpenseIndex >= 0) {
+        // Mettre à jour l'existant
+        nextMonthData.otherExpenses[existingAutoExpenseIndex] = autoExpense;
+      } else {
+        // Ajouter la nouvelle ligne
+        nextMonthData.otherExpenses.push(autoExpense);
+      }
+
+      // Sauvegarder le mois suivant avec la régularisation
+      await saveMonth(nextMonthKey, nextMonthData);
+    }
+
+    setCurrentMonth(nextMonthData);
   };
 
   const editHistoricalMonth = (index) => {
@@ -888,12 +904,36 @@ const App = () => {
                       </div>
                       <div className="space-y-3">
                         {currentMonth.otherExpenses.map((exp, index) => (
-                          <div key={index} className="bg-white/5 rounded-xl p-3 sm:p-4 border border-white/10">
+                          <div
+                            key={index}
+                            className={`rounded-xl p-3 sm:p-4 border ${
+                              exp.isAutomatic
+                                ? 'bg-blue-500/10 border-blue-400/50 relative'
+                                : 'bg-white/5 border-white/10'
+                            }`}
+                          >
+                            {/* Badge AUTOMATIQUE */}
+                            {exp.isAutomatic && (
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
+                                  🔒 AUTOMATIQUE - LECTURE SEULE
+                                </span>
+                                <span className="text-blue-300 text-xs italic">
+                                  (Synchronisé depuis la régularisation)
+                                </span>
+                              </div>
+                            )}
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                               <select
                                 value={exp.payer}
                                 onChange={(e) => updateOtherExpense(index, 'payer', e.target.value)}
-                                className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                                disabled={exp.isAutomatic}
+                                className={`px-3 py-2 ${
+                                  exp.isAutomatic
+                                    ? 'bg-gray-700/50 cursor-not-allowed opacity-60'
+                                    : 'bg-white/10'
+                                } border border-white/20 rounded-lg text-white text-sm`}
                               >
                                 <option value="">Qui a payé ?</option>
                                 {roommates.map((name, i) => (
@@ -903,7 +943,12 @@ const App = () => {
                               <select
                                 value={exp.recipient}
                                 onChange={(e) => updateOtherExpense(index, 'recipient', e.target.value)}
-                                className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                                disabled={exp.isAutomatic}
+                                className={`px-3 py-2 ${
+                                  exp.isAutomatic
+                                    ? 'bg-gray-700/50 cursor-not-allowed opacity-60'
+                                    : 'bg-white/10'
+                                } border border-white/20 rounded-lg text-white text-sm`}
                               >
                                 <option value="">Pour qui ?</option>
                                 {roommates.map((name, i) => (
@@ -916,21 +961,33 @@ const App = () => {
                                 type="number"
                                 value={exp.amount}
                                 onChange={(e) => updateOtherExpense(index, 'amount', e.target.value)}
+                                disabled={exp.isAutomatic}
                                 placeholder="Montant avancé"
-                                className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 text-sm"
+                                className={`px-3 py-2 ${
+                                  exp.isAutomatic
+                                    ? 'bg-gray-700/50 cursor-not-allowed opacity-60'
+                                    : 'bg-white/10'
+                                } border border-white/20 rounded-lg text-white placeholder-gray-400 text-sm`}
                               />
                               <input
                                 type="text"
                                 value={exp.description}
                                 onChange={(e) => updateOtherExpense(index, 'description', e.target.value)}
+                                disabled={exp.isAutomatic}
                                 placeholder="Motif (ex: médicaments, taxi...)"
-                                className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 text-sm"
+                                className={`px-3 py-2 ${
+                                  exp.isAutomatic
+                                    ? 'bg-gray-700/50 cursor-not-allowed opacity-60'
+                                    : 'bg-white/10'
+                                } border border-white/20 rounded-lg text-white placeholder-gray-400 text-sm`}
                               />
                             </div>
                             <div className="flex justify-end">
-                              <button onClick={() => removeOtherExpense(index)} className="text-red-400 hover:text-red-300">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {!exp.isAutomatic && (
+                                <button onClick={() => removeOtherExpense(index)} className="text-red-400 hover:text-red-300">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -1073,7 +1130,7 @@ const App = () => {
                   {editingMonth === null ? (
                     <>
                       <button
-                        onClick={() => generatePDF(currentMonth, roommates)}
+                        onClick={() => generateStyledPDF(currentMonth, roommates)}
                         className="flex-1 px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
                       >
                         <Download className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1137,7 +1194,7 @@ const App = () => {
                               <span className="hidden sm:inline">Modifier</span>
                             </button>
                             <button
-                              onClick={() => generatePDF(month, roommates)}
+                              onClick={() => generateStyledPDF(month, roommates)}
                               className="px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all flex items-center gap-2 text-sm"
                             >
                               <Download className="w-3 h-3 sm:w-4 sm:h-4" />
