@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Download, Users, Receipt, TrendingUp, Calendar, Euro, FileText, ArrowRight, Check, Edit2, Save, X } from 'lucide-react';
-import { getColocConfig, saveColocConfig, getMonth, saveMonth, getAllMonths, getMonthKey } from './api';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Trash2, Download, Users, Receipt, TrendingUp, Calendar, Euro, FileText, ArrowRight, Check, Edit2, Save, X, Upload, Database } from 'lucide-react';
+import { getColocConfig, saveColocConfig, getMonth, saveMonth, getAllMonths, getMonthKey, exportAllData, importAllData } from './localStorage';
 import { generateStyledPDF } from './pdfGenerator';
 
 const formatEuro = (amount) => {
@@ -34,6 +34,37 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('frais');
   const [view, setView] = useState('current');
   const [editingMonth, setEditingMonth] = useState(null);
+
+  // Ref pour l'input file d'import
+  const fileInputRef = useRef(null);
+
+  // Handler pour exporter les données
+  const handleExport = () => {
+    exportAllData();
+  };
+
+  // Handler pour importer les données
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const result = await importAllData(file);
+      alert(`✅ Import réussi !\nDate d'export: ${new Date(result.importDate).toLocaleString('fr-FR')}\nNombre de mois: ${result.monthsCount}`);
+
+      // Recharger les données
+      window.location.reload();
+    } catch (error) {
+      alert(`❌ Erreur lors de l'import: ${error.message}`);
+    }
+
+    // Réinitialiser l'input
+    event.target.value = '';
+  };
 
   // Charger les données au démarrage
   useEffect(() => {
@@ -545,6 +576,37 @@ const App = () => {
             Coloc<span className="gradient-text">Manager</span>
           </h1>
           <p className="text-purple-200 text-sm sm:text-lg font-light">Gérez votre colocation en toute simplicité</p>
+
+          {/* Boutons Export/Import */}
+          {isSetupComplete && (
+            <div className="flex justify-center gap-3 mt-4">
+              <button
+                onClick={handleExport}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 text-sm shadow-lg"
+                title="Sauvegarder toutes les données en JSON"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Exporter les données</span>
+                <span className="sm:hidden">Export</span>
+              </button>
+              <button
+                onClick={handleImportClick}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 text-sm shadow-lg"
+                title="Restaurer des données depuis un fichier JSON"
+              >
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">Importer des données</span>
+                <span className="sm:hidden">Import</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImportFile}
+                style={{ display: 'none' }}
+              />
+            </div>
+          )}
         </div>
 
         {!isSetupComplete ? (
