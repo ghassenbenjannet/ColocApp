@@ -62,7 +62,7 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('👥 COLOCATAIRES', 16, yPosition + 5.5);
+  doc.text('COLOCATAIRES', 16, yPosition + 5.5);
 
   yPosition += 10;
   doc.setTextColor(0, 0, 0);
@@ -74,12 +74,12 @@ export const generateStyledPDF = (monthData, roommates) => {
   });
 
   // Type de mois
-  yPosition += 2;
+  yPosition += 3;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
-  doc.text(`Type de mois: ${monthType === 'custom' ? 'Personnalisé (au prorata des jours)' : 'Complet (50/50)'}`, 20, yPosition);
-  yPosition += 10;
+  doc.text(`Type de mois: ${monthType === 'custom' ? 'Personnalise (au prorata des jours)' : 'Complet (50/50)'}`, 20, yPosition);
+  yPosition += 12;
 
   // === SECTION FRAIS FIXES ===
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -87,7 +87,7 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('💶 FRAIS FIXES', 16, yPosition + 5.5);
+  doc.text('FRAIS FIXES', 16, yPosition + 5.5);
   yPosition += 12;
 
   const totalRent = parseFloat(expenses.rent || 0);
@@ -111,7 +111,7 @@ export const generateStyledPDF = (monthData, roommates) => {
   // Tableau des frais fixes
   const fixedExpensesData = [
     ['Loyer', formatEuro(totalRent), expenses.rentPaidBy || '-'],
-    ['Gaz & Électricité', formatEuro(totalUtilities), expenses.utilitiesPaidBy || '-'],
+    ['Gaz & Electricite', formatEuro(totalUtilities), expenses.utilitiesPaidBy || '-'],
     ['Internet', formatEuro(totalInternet), expenses.internetPaidBy || '-'],
   ];
 
@@ -165,7 +165,7 @@ export const generateStyledPDF = (monthData, roommates) => {
     doc.text(`Part par personne: ${formatEuro(perPerson1)}`, 20, yPosition + 12);
   }
 
-  yPosition += 25;
+  yPosition += 28;
 
   // === SECTION FRAIS PARTAGÉS ===
   if (yPosition > pageHeight - 60) {
@@ -178,7 +178,7 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('🛒 FRAIS PARTAGÉS (50% chacun)', 16, yPosition + 5.5);
+  doc.text('FRAIS PARTAGES (50% chacun)', 16, yPosition + 5.5);
   yPosition += 12;
 
   if (sharedExpenses.length === 0) {
@@ -225,7 +225,7 @@ export const generateStyledPDF = (monthData, roommates) => {
       margin: { left: 14, right: 14 }
     });
 
-    yPosition = doc.lastAutoTable.finalY + 10;
+    yPosition = doc.lastAutoTable.finalY + 12;
   }
 
   // === SECTION AUTRES FRAIS ===
@@ -239,7 +239,7 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('💸 AUTRES FRAIS (Avances)', 16, yPosition + 5.5);
+  doc.text('AUTRES FRAIS (Avances)', 16, yPosition + 5.5);
   yPosition += 12;
 
   if (otherExpenses.length === 0) {
@@ -258,7 +258,7 @@ export const generateStyledPDF = (monthData, roommates) => {
 
     doc.autoTable({
       startY: yPosition,
-      head: [['Payeur', 'Bénéficiaire', 'Montant', 'Motif']],
+      head: [['Payeur', 'Beneficiaire', 'Montant', 'Motif']],
       body: otherExpensesData,
       theme: 'grid',
       headStyles: {
@@ -276,7 +276,7 @@ export const generateStyledPDF = (monthData, roommates) => {
       },
       columnStyles: {
         0: { cellWidth: 40 },      // Payeur
-        1: { cellWidth: 40 },      // Bénéficiaire
+        1: { cellWidth: 40 },      // Beneficiaire
         2: { cellWidth: 35, halign: 'right' },  // Montant
         3: { cellWidth: 'auto' }   // Motif
       },
@@ -286,7 +286,7 @@ export const generateStyledPDF = (monthData, roommates) => {
       margin: { left: 14, right: 14 }
     });
 
-    yPosition = doc.lastAutoTable.finalY + 10;
+    yPosition = doc.lastAutoTable.finalY + 12;
   }
 
   // === SECTION RÉGULARISATION ===
@@ -300,14 +300,14 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('⚖️ RÉGULARISATION', 16, yPosition + 5.5);
+  doc.text('REGULARISATION', 16, yPosition + 5.5);
   yPosition += 12;
 
   if (!regularization.type) {
     doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(10);
-    doc.text('Aucune régularisation prévue', 20, yPosition);
+    doc.text('Aucune regularisation prevue', 20, yPosition);
     yPosition += 10;
   } else {
     doc.setFillColor(250, 250, 250);
@@ -319,17 +319,17 @@ export const generateStyledPDF = (monthData, roommates) => {
     doc.setFontSize(10);
 
     if (regularization.type === 'ponctuelle') {
-      doc.text('Type: Régularisation ponctuelle (virement immédiat)', 20, yPosition + 5);
+      doc.text('Type: Regularisation ponctuelle (virement immediat)', 20, yPosition + 5);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${regularization.from} doit verser ${formatEuro(regularization.amount)} à ${regularization.to}`, 20, yPosition + 11);
+      doc.text(`${regularization.from} doit verser ${formatEuro(regularization.amount)} a ${regularization.to}`, 20, yPosition + 11);
       if (regularization.date) {
-        doc.text(`Date prévue: ${new Date(regularization.date).toLocaleDateString('fr-FR')}`, 20, yPosition + 17);
+        doc.text(`Date prevue: ${new Date(regularization.date).toLocaleDateString('fr-FR')}`, 20, yPosition + 17);
       }
       yPosition += 25;
     } else {
       doc.text('Type: Retenue sur le mois suivant', 20, yPosition + 5);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Montant à déduire: ${formatEuro(regularization.amount)} (déduction pour ${regularization.recipient})`, 20, yPosition + 11);
+      doc.text(`Montant a deduire: ${formatEuro(regularization.amount)} (deduction pour ${regularization.recipient})`, 20, yPosition + 11);
       yPosition += 18;
     }
   }
@@ -430,7 +430,7 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('RÉCAPITULATIF FINAL', pageWidth / 2, yPosition + 8, { align: 'center' });
+  doc.text('RECAPITULATIF FINAL', pageWidth / 2, yPosition + 8, { align: 'center' });
 
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
@@ -449,9 +449,9 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setTextColor(150, 150, 150);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'italic');
-  doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`,
+  doc.text(`Document genere le ${new Date().toLocaleDateString('fr-FR')} a ${new Date().toLocaleTimeString('fr-FR')}`,
     pageWidth / 2, yPosition, { align: 'center' });
-  doc.text('ColocManager - Gestion simplifiée de colocation',
+  doc.text('ColocManager - Gestion simplifiee de colocation',
     pageWidth / 2, yPosition + 4, { align: 'center' });
 
   // Sauvegarder le PDF
