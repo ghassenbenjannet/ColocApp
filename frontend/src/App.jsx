@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Download, Users, Receipt, TrendingUp, Calendar, Euro, FileText, ArrowRight, Check, Edit2, Save, X } from 'lucide-react';
 import { getColocConfig, saveColocConfig, getMonth, saveMonth, getAllMonths, getMonthKey } from './api';
 import { generateStyledPDF } from './pdfGenerator';
@@ -423,60 +423,47 @@ const App = () => {
     const { expenses, sharedExpenses, otherExpenses, monthType } = monthData;
 
     const totalFixed = parseFloat(expenses.rent || 0) + parseFloat(expenses.utilities || 0) + parseFloat(expenses.internet || 0);
+    const rentAmount = parseFloat(expenses.rent || 0);
+    const utilitiesAmount = parseFloat(expenses.utilities || 0);
+    const internetAmount = parseFloat(expenses.internet || 0);
 
-    let balance = {};
+    // Initialiser le balance à 0 pour chaque colocataire
+    let balance = {
+      [roommates[0]]: 0,
+      [roommates[1]]: 0
+    };
 
+    // ÉTAPE 1 : Soustraire ce qui a été payé (négatif = a payé)
+    if (expenses.rentPaidBy) {
+      balance[expenses.rentPaidBy] -= rentAmount;
+    }
+    if (expenses.utilitiesPaidBy) {
+      balance[expenses.utilitiesPaidBy] -= utilitiesAmount;
+    }
+    if (expenses.internetPaidBy) {
+      balance[expenses.internetPaidBy] -= internetAmount;
+    }
+
+    // ÉTAPE 2 : Ajouter ce qui est dû (positif = doit)
     if (monthType === 'custom') {
       const days1 = parseInt(expenses.daysRoommate1 || 0);
       const days2 = parseInt(expenses.daysRoommate2 || 0);
       const totalDays = days1 + days2;
 
       if (totalDays > 0) {
-        balance[roommates[0]] = (totalFixed * days1) / totalDays;
-        balance[roommates[1]] = (totalFixed * days2) / totalDays;
+        balance[roommates[0]] += (totalFixed * days1) / totalDays;
+        balance[roommates[1]] += (totalFixed * days2) / totalDays;
       } else {
-        balance[roommates[0]] = totalFixed / 2;
-        balance[roommates[1]] = totalFixed / 2;
+        balance[roommates[0]] += totalFixed / 2;
+        balance[roommates[1]] += totalFixed / 2;
       }
     } else {
-      balance[roommates[0]] = totalFixed / 2;
-      balance[roommates[1]] = totalFixed / 2;
+      // Mois complet : division égale 50/50
+      balance[roommates[0]] += totalFixed / 2;
+      balance[roommates[1]] += totalFixed / 2;
     }
 
-    const rentAmount = parseFloat(expenses.rent || 0);
-    const utilitiesAmount = parseFloat(expenses.utilities || 0);
-    const internetAmount = parseFloat(expenses.internet || 0);
-
-    if (expenses.rentPaidBy) {
-      const other = roommates.find(r => r !== expenses.rentPaidBy);
-      const share = monthType === 'custom' ?
-        (rentAmount * parseInt(expenses[`daysRoommate${roommates.indexOf(other) + 1}`] || 0)) /
-        (parseInt(expenses.daysRoommate1 || 0) + parseInt(expenses.daysRoommate2 || 0)) :
-        rentAmount / 2;
-      balance[expenses.rentPaidBy] -= share;
-      if (other) balance[other] += share;
-    }
-
-    if (expenses.utilitiesPaidBy) {
-      const other = roommates.find(r => r !== expenses.utilitiesPaidBy);
-      const share = monthType === 'custom' ?
-        (utilitiesAmount * parseInt(expenses[`daysRoommate${roommates.indexOf(other) + 1}`] || 0)) /
-        (parseInt(expenses.daysRoommate1 || 0) + parseInt(expenses.daysRoommate2 || 0)) :
-        utilitiesAmount / 2;
-      balance[expenses.utilitiesPaidBy] -= share;
-      if (other) balance[other] += share;
-    }
-
-    if (expenses.internetPaidBy) {
-      const other = roommates.find(r => r !== expenses.internetPaidBy);
-      const share = monthType === 'custom' ?
-        (internetAmount * parseInt(expenses[`daysRoommate${roommates.indexOf(other) + 1}`] || 0)) /
-        (parseInt(expenses.daysRoommate1 || 0) + parseInt(expenses.daysRoommate2 || 0)) :
-        internetAmount / 2;
-      balance[expenses.internetPaidBy] -= share;
-      if (other) balance[other] += share;
-    }
-
+    // ÉTAPE 3 : Frais partagés (déjà correcte)
     sharedExpenses.forEach(exp => {
       const share = parseFloat(exp.amount || 0) / 2;
       balance[exp.paidBy] -= share;
@@ -484,6 +471,7 @@ const App = () => {
       if (other) balance[other] += share;
     });
 
+    // ÉTAPE 4 : Autres frais (déjà correcte)
     otherExpenses.forEach(exp => {
       balance[exp.payer] -= parseFloat(exp.amount || 0);
       balance[exp.recipient] += parseFloat(exp.amount || 0);
@@ -492,7 +480,7 @@ const App = () => {
     return balance;
   };
 
-  const balance = calculateBalance(currentMonth);
+  const balance = useMemo(() => calculateBalance(currentMonth), [currentMonth, roommates]);
   const owes = balance[roommates[0]] > balance[roommates[1]]
     ? { debtor: roommates[0], creditor: roommates[1], amount: balance[roommates[0]] - balance[roommates[1]] }
     : { debtor: roommates[1], creditor: roommates[0], amount: balance[roommates[1]] - balance[roommates[0]] };
