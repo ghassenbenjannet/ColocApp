@@ -341,58 +341,47 @@ export const generateStyledPDF = (monthData, roommates) => {
   // Calculer le solde
   const calculateBalance = () => {
     const totalFixed = parseFloat(expenses.rent || 0) + parseFloat(expenses.utilities || 0) + parseFloat(expenses.internet || 0);
-    let balance = {};
-
-    if (monthType === 'custom') {
-      const days1 = parseInt(expenses.daysRoommate1 || 0);
-      const days2 = parseInt(expenses.daysRoommate2 || 0);
-      const totalDays = days1 + days2;
-      if (totalDays > 0) {
-        balance[roommates[0]] = (totalFixed * days1) / totalDays;
-        balance[roommates[1]] = (totalFixed * days2) / totalDays;
-      } else {
-        balance[roommates[0]] = totalFixed / 2;
-        balance[roommates[1]] = totalFixed / 2;
-      }
-    } else {
-      balance[roommates[0]] = totalFixed / 2;
-      balance[roommates[1]] = totalFixed / 2;
-    }
-
     const rentAmount = parseFloat(expenses.rent || 0);
     const utilitiesAmount = parseFloat(expenses.utilities || 0);
     const internetAmount = parseFloat(expenses.internet || 0);
 
+    // Initialiser le balance à 0 pour chaque colocataire
+    let balance = {
+      [roommates[0]]: 0,
+      [roommates[1]]: 0
+    };
+
+    // ÉTAPE 1 : Soustraire ce qui a été payé (négatif = a payé)
     if (expenses.rentPaidBy) {
-      const other = roommates.find(r => r !== expenses.rentPaidBy);
-      const share = monthType === 'custom' ?
-        (rentAmount * parseInt(expenses[`daysRoommate${roommates.indexOf(other) + 1}`] || 0)) /
-        (parseInt(expenses.daysRoommate1 || 0) + parseInt(expenses.daysRoommate2 || 0)) :
-        rentAmount / 2;
-      balance[expenses.rentPaidBy] -= share;
-      if (other) balance[other] += share;
+      balance[expenses.rentPaidBy] -= rentAmount;
     }
-
     if (expenses.utilitiesPaidBy) {
-      const other = roommates.find(r => r !== expenses.utilitiesPaidBy);
-      const share = monthType === 'custom' ?
-        (utilitiesAmount * parseInt(expenses[`daysRoommate${roommates.indexOf(other) + 1}`] || 0)) /
-        (parseInt(expenses.daysRoommate1 || 0) + parseInt(expenses.daysRoommate2 || 0)) :
-        utilitiesAmount / 2;
-      balance[expenses.utilitiesPaidBy] -= share;
-      if (other) balance[other] += share;
+      balance[expenses.utilitiesPaidBy] -= utilitiesAmount;
     }
-
     if (expenses.internetPaidBy) {
-      const other = roommates.find(r => r !== expenses.internetPaidBy);
-      const share = monthType === 'custom' ?
-        (internetAmount * parseInt(expenses[`daysRoommate${roommates.indexOf(other) + 1}`] || 0)) /
-        (parseInt(expenses.daysRoommate1 || 0) + parseInt(expenses.daysRoommate2 || 0)) :
-        internetAmount / 2;
-      balance[expenses.internetPaidBy] -= share;
-      if (other) balance[other] += share;
+      balance[expenses.internetPaidBy] -= internetAmount;
     }
 
+    // ÉTAPE 2 : Ajouter ce qui est dû (positif = doit)
+    if (monthType === 'custom') {
+      const days1 = parseInt(expenses.daysRoommate1 || 0);
+      const days2 = parseInt(expenses.daysRoommate2 || 0);
+      const totalDays = days1 + days2;
+
+      if (totalDays > 0) {
+        balance[roommates[0]] += (totalFixed * days1) / totalDays;
+        balance[roommates[1]] += (totalFixed * days2) / totalDays;
+      } else {
+        balance[roommates[0]] += totalFixed / 2;
+        balance[roommates[1]] += totalFixed / 2;
+      }
+    } else {
+      // Mois complet : division égale 50/50
+      balance[roommates[0]] += totalFixed / 2;
+      balance[roommates[1]] += totalFixed / 2;
+    }
+
+    // ÉTAPE 3 : Frais partagés
     sharedExpenses.forEach(exp => {
       const share = parseFloat(exp.amount || 0) / 2;
       balance[exp.paidBy] -= share;
@@ -400,6 +389,7 @@ export const generateStyledPDF = (monthData, roommates) => {
       if (other) balance[other] += share;
     });
 
+    // ÉTAPE 4 : Autres frais
     otherExpenses.forEach(exp => {
       balance[exp.payer] -= parseFloat(exp.amount || 0);
       balance[exp.recipient] += parseFloat(exp.amount || 0);
@@ -409,9 +399,10 @@ export const generateStyledPDF = (monthData, roommates) => {
   };
 
   const balance = calculateBalance();
-  const owes = balance[roommates[0]] > balance[roommates[1]]
-    ? { debtor: roommates[0], creditor: roommates[1], amount: balance[roommates[0]] - balance[roommates[1]] }
-    : { debtor: roommates[1], creditor: roommates[0], amount: balance[roommates[1]] - balance[roommates[0]] };
+  // Le balance négatif = créditeur (on lui doit), positif = débiteur (il doit)
+  const owes = balance[roommates[0]] > 0
+    ? { debtor: roommates[0], creditor: roommates[1], amount: balance[roommates[0]] }
+    : { debtor: roommates[1], creditor: roommates[0], amount: balance[roommates[1]] };
 
   yPosition += 5;
 
