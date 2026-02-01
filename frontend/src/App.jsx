@@ -481,9 +481,10 @@ const App = () => {
   };
 
   const balance = useMemo(() => calculateBalance(currentMonth), [currentMonth, roommates]);
-  const owes = balance[roommates[0]] > balance[roommates[1]]
-    ? { debtor: roommates[0], creditor: roommates[1], amount: balance[roommates[0]] - balance[roommates[1]] }
-    : { debtor: roommates[1], creditor: roommates[0], amount: balance[roommates[1]] - balance[roommates[0]] };
+  // Le balance négatif = créditeur (on lui doit), positif = débiteur (il doit)
+  const owes = balance[roommates[0]] > 0
+    ? { debtor: roommates[0], creditor: roommates[1], amount: balance[roommates[0]] }
+    : { debtor: roommates[1], creditor: roommates[0], amount: balance[roommates[1]] };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4 md:p-8 font-['Archivo',sans-serif]">
@@ -1221,9 +1222,10 @@ const App = () => {
                 ) : (
                   history.map((month, index) => {
                     const monthBalance = calculateBalance(month);
-                    const monthOwes = monthBalance[roommates[0]] > monthBalance[roommates[1]]
-                      ? { debtor: roommates[0], creditor: roommates[1], amount: monthBalance[roommates[0]] - monthBalance[roommates[1]] }
-                      : { debtor: roommates[1], creditor: roommates[0], amount: monthBalance[roommates[1]] - monthBalance[roommates[0]] };
+                    // Le balance négatif = créditeur (on lui doit), positif = débiteur (il doit)
+                    const monthOwes = monthBalance[roommates[0]] > 0
+                      ? { debtor: roommates[0], creditor: roommates[1], amount: monthBalance[roommates[0]] }
+                      : { debtor: roommates[1], creditor: roommates[0], amount: monthBalance[roommates[1]] };
 
                     return (
                       <div key={index} className="glass rounded-2xl p-4 sm:p-6 card-hover">
