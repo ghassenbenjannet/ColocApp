@@ -47,20 +47,78 @@ const App = () => {
           setStartDate(config.startDate);
         }
 
-        // Charger le mois en cours
-        const now = new Date();
-        const monthKey = getMonthKey(
-          now.toLocaleDateString('fr-FR', { month: 'long' }),
-          now.getFullYear()
-        );
-        const currentData = await getMonth(monthKey);
-        if (currentData) {
-          setCurrentMonth(currentData);
+        // Charger l'historique d'abord
+        const allMonths = await getAllMonths();
+        const historyData = allMonths.map(m => m.data);
+        setHistory(historyData);
+
+        // Déterminer le "mois en cours de remplissage"
+        let workingMonth = null;
+
+        if (historyData.length > 0) {
+          // Trouver le dernier mois (le plus récent)
+          const lastMonth = historyData[0]; // Déjà trié par date décroissante
+
+          // Calculer le mois suivant
+          const lastDate = new Date(lastMonth.year,
+            ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+              .indexOf(lastMonth.month.toLowerCase()));
+          lastDate.setMonth(lastDate.getMonth() + 1);
+
+          const nextMonthName = lastDate.toLocaleDateString('fr-FR', { month: 'long' });
+          const nextYear = lastDate.getFullYear();
+          const nextMonthKey = getMonthKey(nextMonthName, nextYear);
+
+          // Essayer de charger le mois suivant
+          const nextMonthData = await getMonth(nextMonthKey);
+
+          if (nextMonthData) {
+            // Le mois suivant existe déjà, c'est notre "mois en cours"
+            workingMonth = nextMonthData;
+          } else {
+            // Le mois suivant n'existe pas, créer un nouveau mois
+            workingMonth = {
+              month: nextMonthName,
+              year: nextYear,
+              monthType: 'complete',
+              expenses: {
+                rent: '', rentPaidBy: '',
+                utilities: '', utilitiesPaidBy: '',
+                internet: '', internetPaidBy: '',
+                daysRoommate1: '30',
+                daysRoommate2: '30'
+              },
+              sharedExpenses: [],
+              otherExpenses: [],
+              regularization: { type: '', from: '', to: '', amount: '', date: '', recipient: '' }
+            };
+          }
+        } else if (config.isSetupComplete && config.startDate) {
+          // Aucun mois archivé, utiliser la date de début
+          const [year, month] = config.startDate.split('-');
+          const monthName = new Date(year, parseInt(month) - 1).toLocaleDateString('fr-FR', { month: 'long' });
+
+          workingMonth = {
+            month: monthName,
+            year: parseInt(year),
+            monthType: 'complete',
+            expenses: {
+              rent: '', rentPaidBy: '',
+              utilities: '', utilitiesPaidBy: '',
+              internet: '', internetPaidBy: '',
+              daysRoommate1: '30',
+              daysRoommate2: '30'
+            },
+            sharedExpenses: [],
+            otherExpenses: [],
+            regularization: { type: '', from: '', to: '', amount: '', date: '', recipient: '' }
+          };
         }
 
-        // Charger l'historique
-        const allMonths = await getAllMonths();
-        setHistory(allMonths.map(m => m.data));
+        // Définir le mois de travail
+        if (workingMonth) {
+          setCurrentMonth(workingMonth);
+        }
 
       } catch (error) {
         console.error('Erreur lors du chargement:', error);

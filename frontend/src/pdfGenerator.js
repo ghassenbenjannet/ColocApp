@@ -41,12 +41,19 @@ export const generateStyledPDF = (monthData, roommates) => {
   doc.setFont('helvetica', 'normal');
   doc.text('Récapitulatif de Colocation', pageWidth / 2, 22, { align: 'center' });
 
-  // Mois et année
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${month.charAt(0).toUpperCase() + month.slice(1)} ${year}`, pageWidth / 2, 35, { align: 'center' });
+  // Mois et année - Encadré
+  let yPosition = 30;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(pageWidth / 2 - 50, yPosition, 100, 12, 3, 3, 'FD');
 
-  let yPosition = 45;
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${month.charAt(0).toUpperCase() + month.slice(1)} ${year}`, pageWidth / 2, yPosition + 8, { align: 'center' });
+
+  yPosition = 48;
 
   // === SECTION COLOCATAIRES ===
   doc.setTextColor(0, 0, 0);
@@ -117,11 +124,18 @@ export const generateStyledPDF = (monthData, roommates) => {
       fillColor: [99, 102, 241],
       textColor: 255,
       fontStyle: 'bold',
-      fontSize: 10
+      fontSize: 10,
+      halign: 'left'
     },
     styles: {
       fontSize: 10,
-      cellPadding: 4
+      cellPadding: 5,
+      minCellHeight: 10
+    },
+    columnStyles: {
+      0: { cellWidth: 60 },      // Type
+      1: { cellWidth: 50, halign: 'right' },  // Montant
+      2: { cellWidth: 'auto' }   // Payé par
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252]
@@ -190,11 +204,20 @@ export const generateStyledPDF = (monthData, roommates) => {
         fillColor: [59, 130, 246],
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 10
+        fontSize: 10,
+        halign: 'left'
       },
       styles: {
-        fontSize: 9,
-        cellPadding: 3
+        fontSize: 10,
+        cellPadding: 5,
+        minCellHeight: 10,
+        overflow: 'linebreak'
+      },
+      columnStyles: {
+        0: { cellWidth: 60 },      // Description
+        1: { cellWidth: 35, halign: 'right' },  // Montant Total
+        2: { cellWidth: 45 },      // Payé par
+        3: { cellWidth: 35, halign: 'right' }   // Part/personne
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252]
@@ -242,11 +265,20 @@ export const generateStyledPDF = (monthData, roommates) => {
         fillColor: [236, 72, 153],
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 10
+        fontSize: 10,
+        halign: 'left'
       },
       styles: {
-        fontSize: 9,
-        cellPadding: 3
+        fontSize: 10,
+        cellPadding: 5,
+        minCellHeight: 10,
+        overflow: 'linebreak'
+      },
+      columnStyles: {
+        0: { cellWidth: 40 },      // Payeur
+        1: { cellWidth: 40 },      // Bénéficiaire
+        2: { cellWidth: 35, halign: 'right' },  // Montant
+        3: { cellWidth: 'auto' }   // Motif
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252]
