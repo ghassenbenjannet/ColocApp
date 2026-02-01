@@ -9,7 +9,24 @@ const PORT = process.env.PORT || 3001;
 const DATA_DIR = path.join(__dirname, 'data');
 
 // Middleware
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://ghassenbenjannet.github.io'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Autoriser les requêtes sans origine (comme les apps mobiles ou curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Non autorisé par CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(bodyParser.json());
 
 // Servir les fichiers statiques du frontend en production
