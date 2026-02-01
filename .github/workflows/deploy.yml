@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - claude/add-json-data-storage-B9BiC
   workflow_dispatch:
 
 permissions:
