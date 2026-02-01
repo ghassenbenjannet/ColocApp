@@ -17,8 +17,6 @@ export const generateStyledPDF = (monthData, roommates) => {
   const primaryColor = [102, 126, 234]; // Bleu-violet
   const secondaryColor = [139, 92, 246]; // Violet
   const accentColor = [236, 72, 153]; // Rose
-  const darkBg = [30, 27, 75]; // Fond sombre
-  const lightText = [255, 255, 255]; // Blanc
 
   // === EN-TÊTE AVEC DÉGRADÉ ===
   // Simuler un dégradé avec des rectangles

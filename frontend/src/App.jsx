@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Trash2, Download, Users, Receipt, TrendingUp, Calendar, Euro, FileText, ArrowRight, Check, Edit2, Save, X, Upload, Database } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Plus, Trash2, Download, Users, Receipt, TrendingUp, Calendar, Euro, FileText, ArrowRight, Check, Edit2, Save, X, Upload } from 'lucide-react';
 import { getColocConfig, saveColocConfig, getMonth, saveMonth, getAllMonths, getMonthKey, exportAllData, importAllData } from './localStorage';
 import { generateStyledPDF } from './pdfGenerator';
 
@@ -450,7 +450,7 @@ const App = () => {
     setView('history');
   };
 
-  const calculateBalance = (monthData) => {
+  const calculateBalance = useCallback((monthData) => {
     const { expenses, sharedExpenses, otherExpenses, monthType } = monthData;
 
     const totalFixed = parseFloat(expenses.rent || 0) + parseFloat(expenses.utilities || 0) + parseFloat(expenses.internet || 0);
@@ -509,9 +509,9 @@ const App = () => {
     });
 
     return balance;
-  };
+  }, [roommates]);
 
-  const balance = useMemo(() => calculateBalance(currentMonth), [currentMonth, roommates]);
+  const balance = useMemo(() => calculateBalance(currentMonth), [currentMonth, calculateBalance]);
   // Le balance négatif = créditeur (on lui doit), positif = débiteur (il doit)
   const owes = balance[roommates[0]] > 0
     ? { debtor: roommates[0], creditor: roommates[1], amount: balance[roommates[0]] }
